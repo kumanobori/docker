@@ -1,0 +1,63 @@
+Vagrant.configure("2") do |config|
+
+  # --- boxの設定 ---
+  # vagrant/dockerが動けばなんでもいいけど、安心できそうなubuntuで。
+  # virtualboxの設定箇所に関連項目があるので注意。
+  config.vm.box = "ubuntu/xenial64"
+  config.disksize.size = "15GB"
+  
+  # 環境の変化を避けるため、チェックを省略とする
+  # config.vm.box_check_update = false
+
+  # 配布する環境が同一内容になることを意識し、ゲスト接続用のsshキーも共通のものを使う
+  config.ssh.insert_key = false
+
+  # ゲストOSにはプライベートネットワーク接続とする
+  config.vm.network "private_network", ip: "192.168.33.10"
+
+  # デフォルト以外の共有フォルダが必要なときはコメントを外して設定する
+  # config.vm.synced_folder "../data", "/vagrant_data"
+
+
+  # --- VirtualBoxの設定 ---
+  config.vm.provider "virtualbox" do |vb|
+    # ホストが32bitOSのときに64bitOSを動かすために必要。
+    vb.customize ["modifyvm", :id, "--ostype", "Ubuntu_64"]
+    # メモリを拡張しておかないと、コンテナによっては起動すらできない
+    vb.memory = "1024"
+  end
+
+  # --- proxyプラグインの設定 ---
+  # proxyが必要ならコメントを外して設定する。これによりゲストOSにProxy設定が為される
+  # if Vagrant.has_plugin?("vagrant-proxyconf")
+  #   config.proxy.http     = "http://hogeproxy:8080/"
+  #   config.proxy.https    = "https://hogeproxy:8080/"
+  #   config.proxy.no_proxy = "localhost,127.0.0.1,.example.com"
+  # end
+
+  # --- シェルでのプロビジョン ---
+  # シェルでゲストOSの初期設定
+  config.vm.provision "shell", privileged: false, inline: <<-SHELL
+      # タイムゾーン設定。やっておかないとUTCになる。
+      sudo timedatectl set-timezone Asia/Tokyo
+      
+      # kernel update required by https://docs.docker.com/engine/release-notes/#18092
+      sudo apt-get update
+      sudo apt-get -y install --no-install-recommends linux-generic-lts-xenial
+      
+      # ゲストOSにssh接続した際の初期ディレクトリは/home/vagrantだが、
+      # ssh接続時に用があるのは大概/Vagrant以下なので、
+      # .profile内の処理でディレクトリを移動しておく
+      echo 'cd /vagrant' >> /home/vagrant/.profile
+  SHELL
+  
+  # --- dockerの設定。これでゲストOSでdockerコマンドが使える ---
+  config.vm.provision :docker
+  
+  # --- docker-composeの設定。これでゲストOSでdocker-composeコマンドが使える ---
+  # ・バージョンを指定しないと古いバージョンになってしまうよう(1.11.2)なので、バージョン番号明示
+  # ・1.24.0は2019/03/29時点の最新
+  # ・vagrant up時にdocker-compose up まで行いたいときは、
+  # 　行途中の#を外してymlオプションを有効にしてdocker-compose.ymlまでのパスを記載
+  config.vm.provision :docker_compose, compose_version: "1.24.0" #, yml: "docker-compose.yml"
+end
