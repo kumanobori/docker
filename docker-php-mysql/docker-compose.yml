@@ -1,0 +1,33 @@
+version: '3'
+services:
+  web01:
+    build: ./conf/web01
+    ports:
+      - '80:80'
+    volumes:
+      - ./conf/web01/wwwroot:/var/www/html
+    links:
+      - db01
+    container_name: container-web01
+
+  db01:
+    build: ./conf/db01
+    ports:
+      - '3306:3306'
+    volumes:
+      - ./conf/db01/init_data:/docker-entrypoint-initdb.d
+      - dbdata:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: sampledb01
+      MYSQL_USER: user
+      MYSQL_PASSWORD: userpass
+      TZ: Asiz/Tokyo
+    container_name: container-db01
+
+volumes:
+  dbdata:
+    driver_opts:
+      device: /vagrant/docker/php_mysql/dbdata
+      o: bind
+
