@@ -22,12 +22,13 @@ services:
       MYSQL_DATABASE: sampledb01
       MYSQL_USER: user
       MYSQL_PASSWORD: userpass
-      TZ: Asiz/Tokyo
+      TZ: Asia/Tokyo
     container_name: container-db01
 
 volumes:
   dbdata:
     driver_opts:
-      device: /vagrant/docker/php_mysql/dbdata
+      type: none
+      device: ${PWD}/dbdata
       o: bind
 
