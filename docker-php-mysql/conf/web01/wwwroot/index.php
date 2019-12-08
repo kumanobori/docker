@@ -8,9 +8,13 @@
 	$result = $dbh->query($sql);
 	
 	$timestamp = date("Y-m-d H:i:s");
+	
+	$array = array('a' => 'aaaaa', 'b' => 'bbbbb');
 ?>
 <html><head></head><body>
 	<p><?php echo $timestamp; ?></p>
+	<p><?php echo $array['b']; ?></p>
+	<p><?php echo $array['c']; ?></p>
 	<table>
 		<tr><th>id</th><th>name</th><th>region</th></tr>
 		<?php while($record = $result->fetch(PDO::FETCH_ASSOC)): ?>
@@ -22,3 +26,6 @@
 		<?php endwhile; ?>
 	</table>
 </body></html>
+<?php
+	phpinfo();
+?>
