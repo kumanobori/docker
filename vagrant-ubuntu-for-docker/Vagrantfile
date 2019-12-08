@@ -13,7 +13,7 @@ Vagrant.configure("2") do |config|
   config.ssh.insert_key = false
 
   # ゲストOSにはプライベートネットワーク接続とする
-  config.vm.network "private_network", ip: "192.168.33.10"
+  config.vm.network "private_network", ip: "192.168.2.11"
 
   # デフォルト以外の共有フォルダが必要なときはコメントを外して設定する
   # config.vm.synced_folder "../data", "/vagrant_data"
@@ -45,6 +45,9 @@ Vagrant.configure("2") do |config|
       sudo apt-get update
       sudo apt-get -y install --no-install-recommends linux-generic-lts-xenial
       
+      # docker-composeでタイムゾーン設定をするために必要
+      sudo apt-get install -y tzdata
+      
       # ゲストOSにssh接続した際の初期ディレクトリは/home/vagrantだが、
       # ssh接続時に用があるのは大概/Vagrant以下なので、
       # .profile内の処理でディレクトリを移動しておく
@@ -55,6 +58,7 @@ Vagrant.configure("2") do |config|
   config.vm.provision :docker
   
   # --- docker-composeの設定。これでゲストOSでdocker-composeコマンドが使える ---
+  # ・https://github.com/leighmcculloch/vagrant-docker-compose
   # ・バージョンを指定しないと古いバージョンになってしまうよう(1.11.2)なので、バージョン番号明示
   # ・1.24.0は2019/03/29時点の最新
   # ・vagrant up時にdocker-compose up まで行いたいときは、
