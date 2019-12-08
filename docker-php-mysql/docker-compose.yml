@@ -6,6 +6,8 @@ services:
       - '80:80'
     volumes:
       - ./conf/web01/wwwroot:/var/www/html
+    environment:
+      TZ: Asia/Tokyo
     links:
       - db01
     container_name: container-web01
