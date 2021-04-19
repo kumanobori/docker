@@ -3,9 +3,9 @@ Vagrant.configure("2") do |config|
   # --- boxの設定 ---
   # vagrant/dockerが動けばなんでもいいけど、安心できそうなubuntuで。
   # virtualboxの設定箇所に関連項目があるので注意。
-  config.vm.box = "ubuntu/xenial64"
-  config.disksize.size = "15GB"
-  
+  config.vm.box = "ubuntu/focal64"
+  # config.disksize.size = "50GB"
+
   # 環境の変化を避けるため、チェックを省略とする
   # config.vm.box_check_update = false
 
@@ -13,7 +13,7 @@ Vagrant.configure("2") do |config|
   config.ssh.insert_key = false
 
   # ゲストOSにはプライベートネットワーク接続とする
-  config.vm.network "private_network", ip: "192.168.2.11"
+  config.vm.network "private_network", ip: "192.168.3.11"
 
   # デフォルト以外の共有フォルダが必要なときはコメントを外して設定する
   # config.vm.synced_folder "../data", "/vagrant_data"
@@ -24,7 +24,7 @@ Vagrant.configure("2") do |config|
     # ホストが32bitOSのときに64bitOSを動かすために必要。
     vb.customize ["modifyvm", :id, "--ostype", "Ubuntu_64"]
     # メモリを拡張しておかないと、コンテナによっては起動すらできない
-    vb.memory = "1024"
+    vb.memory = "2048"
   end
 
   # --- proxyプラグインの設定 ---
@@ -35,33 +35,71 @@ Vagrant.configure("2") do |config|
   #   config.proxy.no_proxy = "localhost,127.0.0.1,.example.com"
   # end
 
+
+  # --- dockerの設定。これでゲストOSでdockerコマンドが使える ---
+  config.vm.provision :docker
+
   # --- シェルでのプロビジョン ---
   # シェルでゲストOSの初期設定
   config.vm.provision "shell", privileged: false, inline: <<-SHELL
       # タイムゾーン設定。やっておかないとUTCになる。
       sudo timedatectl set-timezone Asia/Tokyo
-      
-      # kernel update required by https://docs.docker.com/engine/release-notes/#18092
+
+      # パッケージ一覧更新
       sudo apt-get update
-      sudo apt-get -y install --no-install-recommends linux-generic-lts-xenial
-      
+
       # docker-composeでタイムゾーン設定をするために必要
-      sudo apt-get install -y tzdata
-      
+      # boxに最初から入っていれば不要。ubuntu20では不要。
+      # sudo apt-get install -y --no-install-recommends tzdata
+
+      # mysqlクライアント
+      # sudo apt-get install -y --no-install-recommends mysql-client-core-8.0
+
       # ゲストOSにssh接続した際の初期ディレクトリは/home/vagrantだが、
       # ssh接続時に用があるのは大概/Vagrant以下なので、
-      # .profile内の処理でディレクトリを移動しておく
+      # .profile内の処理で初期ディレクトリを移動するようにする
       echo 'cd /vagrant' >> /home/vagrant/.profile
+
+      # vmに取り込みたいdocker imageがある場合は、docker load で取り込む。
+      # ※1:あらかじめdocker saveしたファイルを、docker/image/以下に置いておく必要がある。
+      # ※2:dockerコマンドを使うので、ここより上の行でdockerを入れる必要がある。
+      # ※3:このimageをプロビジョン内のコンテナ構築で使う場合は、config.vm.provision :docker_compose はここより下の行で行う必要がある。
+      find /vagrant/docker/image/*.tar -type f -maxdepth 0 | while read line; do CMD="docker load -i $line"; echo "$CMD"; eval "$CMD"; done
+      find /vagrant/docker/image/*.tar.gz -type f -maxdepth 0 | while read line; do CMD="cat $line | gzip -d | docker load"; echo "$CMD"; eval "$CMD"; done
+
+      # 秘密鍵設置
+      # vagrant内に秘密鍵を置きたい場合に有効化＋編集する。
+      # mkdir -p ~/.ssh
+      # chmod 700 ~/.ssh
+      # cp /vagrant/init/id_rsa_github_kuma ~/.ssh/
+      # chmod 600 ~/.ssh/id_rsa_github_kuma
+
+      # ssh設定
+      # ssh/configを記載したい場合に有効化＋編集する。
+      # 設定した場合は、ssh -T git@github.com で接続確認する
+      # SSHCONFIG=~/.ssh/config
+      # touch ${SSHCONFIG}
+      # chmod 600 ${SSHCONFIG}
+      # echo 'Host github.com'                          >> ${SSHCONFIG}
+      # echo '  HostName github.com'                    >> ${SSHCONFIG}
+      # echo '  User git'                               >> ${SSHCONFIG}
+      # echo '  IdentityFile ~/.ssh/id_rsa_github_kuma' >> ${SSHCONFIG}
+
+      # git設定
+      # gitの設定をしたい場合に有効化＋編集する。
+      # git config --global user.name "kuma"
+      # git config --global user.email "@gmail.com"
+      # git config --global core.autocrlf false
+      # git config --global core.quotepath false
+
   SHELL
-  
-  # --- dockerの設定。これでゲストOSでdockerコマンドが使える ---
-  config.vm.provision :docker
-  
+
   # --- docker-composeの設定。これでゲストOSでdocker-composeコマンドが使える ---
   # ・https://github.com/leighmcculloch/vagrant-docker-compose
-  # ・バージョンを指定しないと古いバージョンになってしまうよう(1.11.2)なので、バージョン番号明示
-  # ・1.24.0は2019/03/29時点の最新
+  #   バージョンを指定しない場合、デフォルト値は最新版ではない。
+  #   2021/04/16時点では、デフォルト値1.24.1、最新版は1.29.1
   # ・vagrant up時にdocker-compose up まで行いたいときは、
   # 　行途中の#を外してymlオプションを有効にしてdocker-compose.ymlまでのパスを記載
-  config.vm.provision :docker_compose, compose_version: "1.24.0" #, yml: "docker-compose.yml"
+  # config.vm.provision :docker_compose, compose_version: "1.24.0" #, yml: "docker-compose.yml"
+  config.vm.provision :docker_compose
 end
